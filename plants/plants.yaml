@@ -1,0 +1,92 @@
+# Plants configuration
+
+# Uncomment to listen on a public interace.
+# host: 0.0.0.0
+# Minimal API with pump control and /metrics for prometheus.
+port: 9191
+
+# Interval *between* polling rounds.
+poll_interval: 5s
+
+# Sensor groups implement hardware collecting from one or more
+# sensors. 3 types are supported:
+# - `ads1115` Supporting the ADS1115 4-ports ADC on i2c.
+# - `mock-ads1115` Returning test data.
+# - `chirp` An i2c device with temperature & moisture sensor
+#           (https://github.com/Miceuz/i2c-moisture-sensor/)
+
+sensor_groups:
+  - kind: 'mock-ads1115'
+    #smbus: 1             # i2c BUS to the ADS1115
+    #i2c_address: 72      # Address of the ADS1115
+    enable_port: 9        # If specified, this GPIO pin will be turned on
+                          # and off during measurement.
+    sensors:
+      # Sensors can be named arbitrarily, but beware that we don't handle
+      # collisions.
+      - Pachira aquatica: &cap_sensor
+          # This is how we define different sensors & calibrations:
+          # Capacitive moisture sensors based on the TL555C chip
+          # kind: 'moisture' is the only supported type now
+          voltage_dry: 2.9
+          voltage_wet: 1.5
+          port: 0
+      - Raphidophora decursiva: &ne555_cap_sensor
+          # Capacitive moisture sensors based on a NE555
+          voltage_dry: 2.05
+          voltage_wet: 0.95
+          port: 1
+      - Willows:
+          <<: *cap_sensor
+          port: 2
+      - Lemon tree:
+          <<: *ne555_cap_sensor
+          port: 3
+  - kind: 'mock-ads1115'
+    enable_port: 11
+    sensors:
+      - Orchid:
+          <<: *cap_sensor
+          port: 0
+  - kind: 'chirp'            # This module provides a temperature and a
+                             # moisture sensor. There's also a light sensor,
+                             # which we don't support yet.
+    #smbus: 1                # i2c bus
+    #i2c_address: 0x20       # i2c address
+    #name: "My other plant"  # defaults to chirp@<bus>:<address>
+    #cap_wet: 500            # Capacitance value returned for 100% humidity.
+    #cap_dry: 250            # Capacitance returned for 0% humidity.
+
+# If configured, pump history is saved across restarts
+# in sqlite3 db. Otherwise, in-memory watering limits
+# are used.
+#
+# Don't keep /tmp which is usually erased at startup.
+watering:
+  pumps_history_db: /tmp/plants_pumps_state.db
+  pumps:
+    # Supported types are `gpio` (pin high to water) and the mock version.
+    - Large pot:
+        kind: 'mock-gpio'
+        port: 9             # GPIO port activates pump on high
+        duration: 20s       # A 4.8w 12v pump sends 240l/h
+        limits:
+          - per_interval: 2w   # Say this plant should be capped at one liter 
+            duration: 35s      # per two weeks +/- priming.
+          - per_interval: 300s # Let capillarity work before we add more.
+            duration: 20s
+        activation_thresholds:
+          - Pachira aquatica: 30%  # Only if pachira at least 70% dry
+    - Shelf:
+        kind: 'mock-gpio'
+        port: 10
+        duration: 3s        # Activate shortly until probe is happy. Actual
+                            # duration can be truncated by the limits.
+        limits:
+          - per_interval: 1w
+            duration: 20s
+          - per_interval: 15s
+            duration: 5s
+        activation_thresholds:
+          - Willows: 60%      # I have two plants here, whenever both are
+          - Lemon tree: 45%   # dry enough. Willows are more robust.

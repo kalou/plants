@@ -1,0 +1,10 @@
+\#auto_saved_files#
+_autosave-*
+*.csv
+*.bak
+*-bak
+report.txt
+moisture-backups
+fp-info-cache
+gerber
+*.xml
