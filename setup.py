@@ -12,5 +12,5 @@ setup(
         "smbus",
     ],
     name="plants",
-    packages=["plants"]
+    packages=["plants"],
 )
