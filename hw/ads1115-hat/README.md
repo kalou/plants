@@ -5,6 +5,7 @@ to reach out with suggestions.*
 ![Overview of PCB](./pcb.png)
 ## Features
  * i2c ADS1115 ADC (+5v) and 8 sensor ports (pinout +5v,GND,out)
+ * re-exports the i2c bus for more advanced sensors
  * powers 4 12v (water pumps, .. devices)
    * Transistors Q{5..8} and polyswitch fuse (also missing in the above 3d image) max current:
      *s8550*: .7A, *ss8550*: 1.5A, mosfets may be an option.

@@ -4,7 +4,7 @@ _autosave-*
 *.bak
 *-bak
 report.txt
-moisture-backups
+*-backups
 fp-info-cache
 gerber
 *.xml

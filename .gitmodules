@@ -1,0 +1,3 @@
+[submodule "hw/canbus/avr/tinycan"]
+	path = hw/canbus/avr/tinycan
+	url = git@github.com:kalou/tinycan.git

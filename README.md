@@ -6,7 +6,7 @@
 Plants is composed of:
 * A sensor monitoring system and water pumps controller, written in Python, that
   runs on Linux, likely a Pi:
-* A [hardware hat](./hat/README.md) for Raspberry Pi, interfacing to pumps and sensors.
+* Some [hardware](./hw) including a Raspberry Pi hat, switches and sensors.
 
 ## Features
 ### Supported sensors
@@ -20,13 +20,6 @@ Plants is composed of:
 ### Metrics
 * Export of sensor and pump data metrics to prometheus.
 * API to poll running config and basic values.
-### Hardware
-* Open source hardware hat:
-  - 8 5v sensors inputs multiplexed to ads1115
-  - re-exports the i2c bus for more advanced sensors
-  - 4x up to 1.5A 12v outputs, for water pumps
-  - takes in 12v supply to power pumps, provides +5v to Pi (**see notes!**)
-
 ## Example configuration
 ```
 # Plants configuration
