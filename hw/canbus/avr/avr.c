@@ -58,6 +58,8 @@ int16_t read_adc(int adc)
 		reading |= ADCH << 8;
 
 		if (i == 0)
+			continue;
+		else if (i == 1)
 			avg = reading;
 		else
 			avg = avg + ((reading - avg) / (i+1));
@@ -83,7 +85,7 @@ uint16_t read_sensor()
 	TXD_low();
 
 	// Give sensor some warmup delay before we measure it.
-	can_delay_ms(300);
+	can_delay_ms(500);
 
 	uint16_t v = read_adc(1);
 
@@ -101,19 +103,25 @@ uint16_t read_sensor()
  * divider trick.
  *
  * From datasheet R-rst is a pullup between 30k & 60k.
- * With a ~60k resistor to GND, approx 1/2 to 2/3 of
- * VCC should be on ADC0.
+ * With a ~47k resistor to GND, ADC0 should read
+ * somewhere between 400 and 700.
  */
 bool is_button()
 {
 	uint16_t v = read_adc(0);
-	return (v > 512 && v < 700);
+	return (v > 350 && v < 750);
 }
 
 bool check_reset_sequence()
 {
 	uint8_t cnt = 0;
 	do {
+		// Signal that we detect it
+		if (is_button() && (cnt%20 == 0)) {
+			SENSOR_on();
+			can_delay_ms(100);
+			SENSOR_off();
+		}
 		if (cnt++ > 200)
 			return true;
 	} while(is_button());
@@ -156,11 +164,17 @@ bool load_config(plants_config_t *conf)
 
 void perform_reconfig(plants_config_t *conf)
 {
+	int attempt = 0;
+	can_header_t *c;
+
 	for(;;) {
-		can_request(PLANTS_AUTOCONF_ID, 0);
-		can_header_t *c = can_receive(200);
-		if (c && c->rtr == 0) {
-			blink();
+		// Shortly enable sensor to signal reset via LED.
+		SENSOR_on();
+		if (!(attempt++ % 5))
+			can_request(PLANTS_AUTOCONF_ID, 0);
+		c = can_receive(200);
+		SENSOR_off();
+		if (c && c->id == PLANTS_AUTOCONF_ID && !c->rtr) {
 			// This contains our ID
 			conf->id = *((uint32_t *) c->data) & 0x1fffffff;
 			// Attempt to publish to it. If we get an
@@ -170,7 +184,6 @@ void perform_reconfig(plants_config_t *conf)
 				return;
 			}
 		}
-		can_delay_ms(200);
 	}
 }
 
@@ -189,36 +202,42 @@ int main(void)
 
 	can_init();
 
+	// Read sensor at boot to indicate firmware startup.
+	read_sensor();
+
 	if (!load_config(&conf)) {
 		can_send(0x123, (char *) &conf, sizeof(conf));
 		perform_reconfig(&conf);
 	}
 
 	for (;;) {
-		can_header_t *c = can_receive(1000);
+		can_header_t *c;
 
-		if (c && c->len == 2 && c->data[0] == PLANTS_CMD_SWITCH) {
-			switch(c->data[1]) {
-				case PLANTS_CMD_SWITCH_ON:
-					if (c->id == conf.id)
-						SWITCH_on();
-					break;
-				case PLANTS_CMD_SWITCH_OFF:
-					if (c->id == PLANTS_ALL_SENSORS_ID ||
-					    c->id == conf.id)
+		do {
+			c = can_receive(500);
+			if (check_reset_sequence()) {
+				DEBUG_high();
+				perform_reconfig(&conf);
+				DEBUG_low();
+			}
+		} while(!c);
+
+
+		if ((c->id == conf.id) || (c->id == PLANTS_ALL_SENSORS_ID)) {
+			if (c->rtr) {
+				uint16_t sensor_data = read_sensor();
+				can_send(conf.id, (char *)&sensor_data, 2);
+			} else if (c->len == 2 && c->data[0] == PLANTS_CMD_SWITCH) {
+				switch(c->data[1]) {
+					case PLANTS_CMD_SWITCH_ON:
+						if (c->id == conf.id)
+							SWITCH_on();
+						break;
+					case PLANTS_CMD_SWITCH_OFF:
 						SWITCH_off();
-					break;
+						break;
+				}
 			}
 		}
-
-		if (check_reset_sequence()) {
-			DEBUG_high();
-			perform_reconfig(&conf);
-			DEBUG_low();
-		}
-
-		/* Read values and broadcast */
-		uint16_t sensor_data = read_sensor();
-		can_send(conf.id, (char *)&sensor_data, 2);
 	}
 }
